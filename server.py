@@ -3,6 +3,8 @@ import os
 import json
 import requests
 import telegram
+import pprint
+from sqlite3 import dbapi2 as sqlite
 
 app = Flask(__name__)
 
@@ -12,6 +14,9 @@ def index():
   chat_id = os.environ['TELEGRAM_CHAT_ID']
   client_id = os.environ['PINTEREST_CLIENT_ID']
   client_secret = os.environ['PINTEREST_CLIENT_SECRET']
+  host = 'https://api.pinterest.com/'
+  db_connection = sqlite.connect('pomodoro.db')
+  db_curs = db_connection.cursor()
 
   state = request.args.get('state')
   code = request.args.get('code')
@@ -22,6 +27,15 @@ def index():
   parsed_response =  json.loads(response.text)
   access_token = parsed_response['access_token']
   print(access_token)
+
+  query_params = '?access_token=' + access_token + '&fields=first_name%2Cid%2Clast_name%2Curl%2Caccount_type%2Cbio%2Ccounts%2Ccreated_at%2Cimage%2Cusername'
+  endpoint = host + 'v1/me/' + query_params
+
+  response = requests.get(endpoint)
+  parsed_response =  json.loads(response.text)['data']
+
+  db_curs.execute('INSERT INTO users (username, first_name, last_name, url, access_token) VALUES ("' + parsed_response['username'] + '", "' + parsed_response['first_name'] + '", "' + parsed_response['last_name'] + '", "' + parsed_response['url'] + '", "' + access_token + '")')
+  db_connection.commit()
 
   query_params = '?access_token=' + access_token + '&fields=id%2Clink%2Cnote%2Curl%2Cattribution%2Cmedia%2Cboard%2Coriginal_link%2Cmetadata%2Ccolor%2Ccounts%2Ccreated_at%2Ccreator%2Cimage'
   response = requests.get('https://api.pinterest.com/v1/me/pins' + query_params)
