@@ -6,6 +6,8 @@ import logging
 import random
 import telegram
 from time import sleep
+import threading
+from sqlite3 import dbapi2 as sqlite
 
 try:
   from urllib.error import URLError
@@ -72,7 +74,42 @@ def checkMessages(bot, update_id):
           if message == '/signup':
             bot.sendMessage(chat_id=chat_id, text='https://api.pinterest.com/oauth/?response_type=code&redirect_uri=https://localhost/signup&client_id=' + os.environ['PINTEREST_CLIENT_ID'] + '&scope=read_public,write_public&state=' + str(chat_id))
 
+          if message == '/start':
+            start(bot, chat_id)
+
     return update_id
+
+def user(chat_id):
+  db_connection = sqlite.connect('pomodoro.db')
+  db_curs = db_connection.cursor()
+  db_curs.execute('SELECT * FROM users')
+  user = db_curs.fetchone()
+  return user
+
+def send_content(bot, chat_id, access_token):
+  query_params = '?access_token=' + access_token + '&fields=id%2Clink%2Cnote%2Curl%2Cattribution%2Cmedia%2Cboard%2Coriginal_link%2Cmetadata%2Ccolor%2Ccounts%2Ccreated_at%2Ccreator%2Cimage'
+  response = requests.get('https://api.pinterest.com/v1/me/pins' + query_params)
+  parsed_response =  json.loads(response.text)
+
+  for pin in parsed_response['data']:
+    img_url = pin['image']['original']['url']
+    print('Sending photo: ' + img_url)
+    bot.sendPhoto(chat_id=chat_id, photo=img_url)
+
+def start(bot, chat_id):
+  text = 'Start working'
+  print text
+  bot.sendMessage(chat_id, text=text)
+  threading.Timer(120.0, rest, [bot, chat_id]).start()
+
+def rest(bot, chat_id):
+  text = 'Now you can rest'
+  print text
+  bot.sendMessage(chat_id, text=text)
+
+  user = user(chat_id)
+  send_content(user[5], chat_id)
+  threading.Timer(60.0, start, [bot, chat_id]).start()
 
 if __name__ == '__main__':
   main()
