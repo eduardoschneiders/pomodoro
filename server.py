@@ -8,8 +8,9 @@ from sqlite3 import dbapi2 as sqlite
 
 app = Flask(__name__)
 
-@app.route('/')
-def index():
+
+@app.route('/signup')
+def signup():
   bot = telegram.Bot(os.environ['TELEGRAM_TOKEN'])
   chat_id = os.environ['TELEGRAM_CHAT_ID']
   client_id = os.environ['PINTEREST_CLIENT_ID']
@@ -18,7 +19,7 @@ def index():
   db_connection = sqlite.connect('pomodoro.db')
   db_curs = db_connection.cursor()
 
-  state = request.args.get('state')
+  chat_id = request.args.get('state')
   code = request.args.get('code')
 
   query_params = '?grant_type=authorization_code&client_id=' + client_id + '&client_secret=' + client_secret + '&code=' + code
@@ -34,8 +35,10 @@ def index():
   response = requests.get(endpoint)
   parsed_response =  json.loads(response.text)['data']
 
-  db_curs.execute('INSERT INTO users (username, first_name, last_name, url, access_token) VALUES ("' + parsed_response['username'] + '", "' + parsed_response['first_name'] + '", "' + parsed_response['last_name'] + '", "' + parsed_response['url'] + '", "' + access_token + '")')
+  db_curs.execute('INSERT INTO users (username, first_name, last_name, url, access_token, chat_id) VALUES ("' + parsed_response['username'] + '", "' + parsed_response['first_name'] + '", "' + parsed_response['last_name'] + '", "' + parsed_response['url'] + '", "' + access_token + '", "' + chat_id + '")')
   db_connection.commit()
+  wellcome_text = 'Welcome ' + parsed_response['first_name'] + ' ' + parsed_response['last_name'] + '! You signup successfully.'
+  bot.sendMessage(chat_id=chat_id, text=wellcome_text)
 
   query_params = '?access_token=' + access_token + '&fields=id%2Clink%2Cnote%2Curl%2Cattribution%2Cmedia%2Cboard%2Coriginal_link%2Cmetadata%2Ccolor%2Ccounts%2Ccreated_at%2Ccreator%2Cimage'
   response = requests.get('https://api.pinterest.com/v1/me/pins' + query_params)
