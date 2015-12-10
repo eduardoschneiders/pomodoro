@@ -8,6 +8,7 @@ import telegram
 from time import sleep
 import threading
 from sqlite3 import dbapi2 as sqlite
+import json
 
 try:
   from urllib.error import URLError
@@ -87,6 +88,11 @@ def user(chat_id):
   return user
 
 def send_content(bot, chat_id, access_token):
+  global requests
+  import requests
+  global json
+  import json
+
   query_params = '?access_token=' + access_token + '&fields=id%2Clink%2Cnote%2Curl%2Cattribution%2Cmedia%2Cboard%2Coriginal_link%2Cmetadata%2Ccolor%2Ccounts%2Ccreated_at%2Ccreator%2Cimage'
   response = requests.get('https://api.pinterest.com/v1/me/pins' + query_params)
   parsed_response =  json.loads(response.text)
@@ -100,16 +106,16 @@ def start(bot, chat_id):
   text = 'Start working'
   print text
   bot.sendMessage(chat_id, text=text)
-  threading.Timer(120.0, rest, [bot, chat_id]).start()
+  threading.Timer(5.0, rest, [bot, chat_id]).start()
 
 def rest(bot, chat_id):
   text = 'Now you can rest'
   print text
   bot.sendMessage(chat_id, text=text)
 
-  user = user(chat_id)
-  send_content(user[5], chat_id)
-  threading.Timer(60.0, start, [bot, chat_id]).start()
+  current_user = user(chat_id)
+  send_content(bot, chat_id, current_user[5])
+  threading.Timer(180.0, start, [bot, chat_id]).start()
 
 if __name__ == '__main__':
   main()
