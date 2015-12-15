@@ -9,7 +9,8 @@ from time import sleep
 import threading
 from sqlite3 import dbapi2 as sqlite
 import json
-import test
+from redis import Redis
+from rq import Queue
 
 try:
   from urllib.error import URLError
@@ -64,7 +65,7 @@ def checkMessages(bot, update_id):
 #   'update_id': 64440194
 # }
 
-    for update in bot.getUpdates(offset=update_id, timeout=10):
+    for update in bot.getUpdates(offset=update_id, timeout=60):
         chat_id = update.message.chat_id
         update_id = update.update_id + 1
 
@@ -91,6 +92,7 @@ def user(chat_id):
 def send_content(bot, chat_id, access_token):
   global pinterest_client
   import pinterest_client
+  q = Queue(connection=Redis())
 
   db_connection = sqlite.connect('pomodoro.db')
   db_curs = db_connection.cursor()
@@ -105,24 +107,23 @@ def send_content(bot, chat_id, access_token):
     pins = pinterest_client.board_pins(board['id'], access_token, next_page)
 
     for pin in pins['data']:
-      print pin['note']
+      print board['name'] + ': ' + pin['note']
+      print pin['image']['original']['url']
 
-      bot.sendPhoto(chat_id=chat_id, photo=pin['image']['original']['url'])
-      bot.sendMessage(chat_id=chat_id, text='Note: ' + pin['note'])
+      result = q.enqueue(bot.sendPhoto, chat_id=chat_id, photo=pin['image']['original']['url'])
+      result = q.enqueue(bot.sendMessage, chat_id=chat_id, text=board['name'] + ': ' + pin['note'])
 
     if board_db:
-      db_curs.execute('UPDATE boards SET next_page = "' + pins['page']['next'] + '"')
+      db_curs.execute('UPDATE boards SET next_page = "' + pins['page']['next'] + '" WHERE name = "' + board['name'] + '"')
     else:
       db_curs.execute('INSERT INTO boards (name, next_page) VALUES ("' + board['name'] + '", "' + pins['page']['next'] + '")')
     db_connection.commit()
-
-
 
 def start(bot, chat_id):
   text = 'Start working'
   print text
   bot.sendMessage(chat_id, text=text)
-  threading.Timer(0.0*60.0, rest, [bot, chat_id]).start()
+  threading.Timer(25*60.0, rest, [bot, chat_id]).start()
 
 def rest(bot, chat_id):
   text = 'Now you can rest'

@@ -17,7 +17,7 @@ def board_pins(board_id, access_token, next_page = ''):
   if next_page:
     endpoint = next_page
   else:
-    query_params = '?access_token=' + access_token + '&fields=id%2Clink%2Cnote%2Curl%2Cimage&limit=1'
+    query_params = '?access_token=' + access_token + '&fields=id%2Clink%2Cnote%2Curl%2Cimage&limit=2'
     path = '/v1/boards/' + board_id + '/pins/'
     endpoint = _PINTEREST_HOST + path + query_params
 
