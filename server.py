@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+
 from flask import Flask, render_template, request, url_for, jsonify
 import os
 import json

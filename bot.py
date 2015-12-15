@@ -9,6 +9,7 @@ from time import sleep
 import threading
 from sqlite3 import dbapi2 as sqlite
 import json
+import test
 
 try:
   from urllib.error import URLError
@@ -73,7 +74,7 @@ def checkMessages(bot, update_id):
         if message:
 
           if message == '/signup':
-            bot.sendMessage(chat_id=chat_id, text='https://api.pinterest.com/oauth/?response_type=code&redirect_uri=https://localhost/signup&client_id=' + os.environ['PINTEREST_CLIENT_ID'] + '&scope=read_public,write_public&state=' + str(chat_id))
+            bot.sendMessage(chat_id=chat_id, text='https://api.pinterest.com/oauth/?response_type=code&redirect_uri=https://localhost/signup&client_id=' + os.environ['PINTEREST_CLIENT_ID'] + '&scope=read_public,write_public,read_relationships,write_relationships&state=' + str(chat_id))
 
           if message == '/start':
             start(bot, chat_id)
@@ -83,30 +84,45 @@ def checkMessages(bot, update_id):
 def user(chat_id):
   db_connection = sqlite.connect('pomodoro.db')
   db_curs = db_connection.cursor()
-  db_curs.execute('SELECT * FROM users')
+  db_curs.execute('SELECT * FROM users where chat_id = ' + str(chat_id))
   user = db_curs.fetchone()
   return user
 
 def send_content(bot, chat_id, access_token):
-  global requests
-  import requests
-  global json
-  import json
+  global pinterest_client
+  import pinterest_client
 
-  query_params = '?access_token=' + access_token + '&fields=id%2Clink%2Cnote%2Curl%2Cattribution%2Cmedia%2Cboard%2Coriginal_link%2Cmetadata%2Ccolor%2Ccounts%2Ccreated_at%2Ccreator%2Cimage'
-  response = requests.get('https://api.pinterest.com/v1/me/pins' + query_params)
-  parsed_response =  json.loads(response.text)
+  db_connection = sqlite.connect('pomodoro.db')
+  db_curs = db_connection.cursor()
 
-  for pin in parsed_response['data']:
-    img_url = pin['image']['original']['url']
-    print('Sending photo: ' + img_url)
-    bot.sendPhoto(chat_id=chat_id, photo=img_url)
+  boards = pinterest_client.my_boards(access_token)
+
+  for board in boards['data']:
+    db_curs.execute('SELECT next_page FROM boards where name = "' + board['name'] + '"')
+    board_db = db_curs.fetchone()
+    next_page = board_db[0] if board_db else None
+
+    pins = pinterest_client.board_pins(board['id'], access_token, next_page)
+
+    for pin in pins['data']:
+      print pin['note']
+
+      bot.sendPhoto(chat_id=chat_id, photo=pin['image']['original']['url'])
+      bot.sendMessage(chat_id=chat_id, text='Note: ' + pin['note'])
+
+    if board_db:
+      db_curs.execute('UPDATE boards SET next_page = "' + pins['page']['next'] + '"')
+    else:
+      db_curs.execute('INSERT INTO boards (name, next_page) VALUES ("' + board['name'] + '", "' + pins['page']['next'] + '")')
+    db_connection.commit()
+
+
 
 def start(bot, chat_id):
   text = 'Start working'
   print text
   bot.sendMessage(chat_id, text=text)
-  threading.Timer(5.0, rest, [bot, chat_id]).start()
+  threading.Timer(0.0*60.0, rest, [bot, chat_id]).start()
 
 def rest(bot, chat_id):
   text = 'Now you can rest'
@@ -115,7 +131,7 @@ def rest(bot, chat_id):
 
   current_user = user(chat_id)
   send_content(bot, chat_id, current_user[5])
-  threading.Timer(180.0, start, [bot, chat_id]).start()
+  threading.Timer(5*60.0, start, [bot, chat_id]).start()
 
 if __name__ == '__main__':
   main()
